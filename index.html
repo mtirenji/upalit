@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Upalit — Own it, gradually.</title>
+<meta name="description" content="Buy tokens in a home you want to own. Reach 30% and apply to finance the rest.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,450;0,9..144,600;1,9..144,450&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+
+  :root{
+    --ink:#12211F;
+    --ink-soft:#3C4C49;
+    --paper:#F5F3EE;
+    --paper-raised:#FBFAF7;
+    --pine:#1B4B45;
+    --pine-deep:#0F2E2A;
+    --sage:#8FA896;
+    --sage-pale:#D9E2D6;
+    --brass:#B8863E;
+    --brass-bright:#D6A24E;
+    --line: rgba(18,33,31,0.14);
+    --line-soft: rgba(18,33,31,0.08);
+
+    --display: 'Fraunces', serif;
+    --body: 'Inter', sans-serif;
+    --mono: 'IBM Plex Mono', monospace;
+
+    --radius: 4px;
+  }
+
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth;}
+  @media (prefers-reduced-motion: reduce){
+    html{scroll-behavior:auto;}
+    *{animation-duration:0.01ms !important; animation-iteration-count:1 !important; transition-duration:0.01ms !important;}
+  }
+
+  body{
+    font-family: var(--body);
+    background:var(--paper);
+    color:var(--ink);
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  a{color:inherit;}
+  img{max-width:100%; display:block;}
+
+  :focus-visible{
+    outline: 2px solid var(--brass);
+    outline-offset: 3px;
+  }
+
+  .wrap{
+    max-width:1180px;
+    margin:0 auto;
+    padding:0 32px;
+  }
+
+  h1,h2,h3{
+    font-family:var(--display);
+    font-weight:450;
+    letter-spacing:-0.01em;
+    color:var(--pine-deep);
+  }
+
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:12.5px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--brass);
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .eyebrow::before{
+    content:"";
+    width:16px; height:1px;
+    background:var(--brass);
+    display:inline-block;
+  }
+
+  .btn{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    font-family:var(--body);
+    font-weight:600;
+    font-size:14.5px;
+    padding:13px 24px;
+    border-radius:2px;
+    text-decoration:none;
+    cursor:pointer;
+    border:1px solid transparent;
+    transition: transform .15s ease, background .15s ease, border-color .15s ease;
+  }
+  .btn-primary{
+    background:var(--pine-deep);
+    color:var(--paper-raised);
+  }
+  .btn-primary:hover{ background:var(--pine); }
+  .btn-ghost{
+    background:transparent;
+    color:var(--pine-deep);
+    border-color:var(--line);
+  }
+  .btn-ghost:hover{ border-color:var(--pine-deep); }
+
+  /* ===== NAV ===== */
+  header{
+    position:sticky; top:0; z-index:50;
+    background:rgba(245,243,238,0.92);
+    backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line-soft);
+  }
+  nav{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:20px 32px;
+    max-width:1180px; margin:0 auto;
+  }
+  .logo{
+    font-family:var(--display);
+    font-size:22px;
+    font-weight:600;
+    letter-spacing:-0.01em;
+    color:var(--pine-deep);
+    text-decoration:none;
+  }
+  .logo span{color:var(--brass);}
+  .nav-links{
+    display:flex; gap:36px;
+    list-style:none;
+  }
+  .nav-links a{
+    text-decoration:none;
+    font-size:14.5px;
+    font-weight:500;
+    color:var(--ink-soft);
+    transition:color .15s ease;
+  }
+  .nav-links a:hover{ color:var(--pine-deep); }
+  .nav-cta{ display:flex; gap:12px; align-items:center;}
+  .nav-mobile-toggle{ display:none; }
+
+  @media (max-width: 880px){
+    .nav-links{ display:none; }
+    .nav-cta .btn-ghost{ display:none; }
+  }
+
+  /* ===== HERO ===== */
+  .hero{
+    padding:96px 0 80px;
+    position:relative;
+    overflow:hidden;
+  }
+  .hero-grid{
+    display:grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    gap:64px;
+    align-items:center;
+  }
+  @media (max-width: 900px){
+    .hero-grid{ grid-template-columns:1fr; }
+  }
+  .hero h1{
+    font-size:clamp(40px, 5.4vw, 68px);
+    line-height:1.03;
+    margin:22px 0 26px;
+  }
+  .hero h1 em{
+    font-style:italic;
+    color:var(--brass);
+  }
+  .hero p.lede{
+    font-size:18px;
+    color:var(--ink-soft);
+    max-width:480px;
+    margin-bottom:34px;
+  }
+  .hero-ctas{ display:flex; gap:14px; flex-wrap:wrap; margin-bottom:38px;}
+  .hero-microcopy{
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:var(--ink-soft);
+    opacity:0.75;
+  }
+
+  /* ---- Ownership Meter (signature element) ---- */
+  .meter-card{
+    background:var(--paper-raised);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:32px;
+    box-shadow: 0 24px 60px -30px rgba(18,33,31,0.35);
+  }
+  .meter-card-head{
+    display:flex; justify-content:space-between; align-items:baseline;
+    margin-bottom:22px;
+  }
+  .meter-card-head .prop{
+    font-family:var(--display);
+    font-size:19px;
+    color:var(--pine-deep);
+  }
+  .meter-card-head .loc{
+    font-family:var(--mono);
+    font-size:11.5px;
+    color:var(--ink-soft);
+  }
+  .meter-track{
+    position:relative;
+    height:34px;
+    background:var(--sage-pale);
+    border-radius:2px;
+    overflow:visible;
+    margin:18px 0 14px;
+  }
+  .meter-fill{
+    position:absolute; top:0; left:0; bottom:0;
+    width:0%;
+    background: linear-gradient(90deg, var(--sage) 0%, var(--pine) 100%);
+    border-radius:2px 0 0 2px;
+    animation: fillMeter 1.8s cubic-bezier(.22,.85,.34,1) 0.3s forwards;
+  }
+  @keyframes fillMeter{ to{ width:63%; } }
+  .meter-threshold{
+    position:absolute;
+    left:30%;
+    top:-9px; bottom:-9px;
+    width:2px;
+    background:var(--brass);
+  }
+  .meter-threshold::after{
+    content:"30%";
+    position:absolute;
+    top:-22px; left:50%;
+    transform:translateX(-50%);
+    font-family:var(--mono);
+    font-size:10.5px;
+    color:var(--brass);
+    letter-spacing:0.04em;
+    white-space:nowrap;
+  }
+  .meter-threshold::before{
+    content:"";
+    position:absolute;
+    bottom:-16px; left:50%;
+    transform:translateX(-50%);
+    width:7px; height:7px;
+    border-radius:50%;
+    background:var(--brass-bright);
+  }
+  .meter-labels{
+    display:flex; justify-content:space-between;
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--ink-soft);
+  }
+  .meter-stats{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+    margin-top:24px;
+    padding-top:22px;
+    border-top:1px solid var(--line-soft);
+  }
+  .meter-stats div span{ display:block; }
+  .meter-stats .val{
+    font-family:var(--mono);
+    font-size:17px;
+    color:var(--pine-deep);
+  }
+  .meter-stats .lbl{
+    font-size:11.5px;
+    color:var(--ink-soft);
+    margin-top:2px;
+  }
+
+  /* ===== SECTION SHARED ===== */
+  section{ padding:88px 0; }
+  .section-head{
+    max-width:600px;
+    margin-bottom:56px;
+  }
+  .section-head h2{
+    font-size:clamp(28px,3.4vw,40px);
+    margin-top:16px;
+    line-height:1.1;
+  }
+  .section-head p{
+    color:var(--ink-soft);
+    font-size:16px;
+    margin-top:16px;
+  }
+
+  /* ===== HOW IT WORKS ===== */
+  .how{ background:var(--paper-raised); border-top:1px solid var(--line-soft); border-bottom:1px solid var(--line-soft); }
+  .steps{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:1px;
+    background:var(--line);
+    border:1px solid var(--line);
+  }
+  @media (max-width:820px){ .steps{ grid-template-columns:1fr; } }
+  .step{
+    background:var(--paper-raised);
+    padding:38px 32px;
+  }
+  .step .stage{
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--brass);
+    letter-spacing:0.08em;
+  }
+  .step h3{
+    font-size:22px;
+    margin:14px 0 12px;
+  }
+  .step p{ color:var(--ink-soft); font-size:15px; }
+
+  /* ===== MARKETPLACE PREVIEW ===== */
+  .props-grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:24px;
+  }
+  @media (max-width:980px){ .props-grid{ grid-template-columns:1fr 1fr; } }
+  @media (max-width:660px){ .props-grid{ grid-template-columns:1fr; } }
+
+  .prop-card{
+    background:var(--paper-raised);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    overflow:hidden;
+    transition: transform .2s ease, box-shadow .2s ease;
+  }
+  .prop-card:hover{
+    transform:translateY(-4px);
+    box-shadow:0 20px 44px -26px rgba(18,33,31,0.4);
+  }
+  .prop-photo{
+    height:150px;
+    background:linear-gradient(135deg, var(--sage-pale), var(--sage));
+    position:relative;
+  }
+  .prop-photo .tag{
+    position:absolute; top:12px; left:12px;
+    background:var(--pine-deep);
+    color:var(--paper-raised);
+    font-family:var(--mono);
+    font-size:10.5px;
+    letter-spacing:0.05em;
+    padding:5px 9px;
+    border-radius:2px;
+  }
+  .prop-body{ padding:22px; }
+  .prop-body .loc{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--ink-soft);
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+  }
+  .prop-body h4{
+    font-family:var(--display);
+    font-size:19px;
+    color:var(--pine-deep);
+    margin:6px 0 16px;
+    font-weight:450;
+  }
+  .prop-meter{
+    height:6px; background:var(--sage-pale); border-radius:3px; overflow:hidden; margin-bottom:10px;
+  }
+  .prop-meter i{
+    display:block; height:100%;
+    background:var(--pine);
+  }
+  .prop-row{
+    display:flex; justify-content:space-between;
+    font-size:13px;
+    color:var(--ink-soft);
+    margin-bottom:4px;
+  }
+  .prop-row b{
+    font-family:var(--mono);
+    font-weight:500;
+    color:var(--pine-deep);
+  }
+
+  /* ===== TRUST ===== */
+  .trust{ background:var(--pine-deep); color:var(--paper); }
+  .trust .eyebrow{ color:var(--brass-bright); }
+  .trust .eyebrow::before{ background:var(--brass-bright); }
+  .trust h2{ color:var(--paper-raised); }
+  .trust-grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:40px;
+    margin-top:52px;
+  }
+  @media (max-width:820px){ .trust-grid{ grid-template-columns:1fr; } }
+  .trust-item h3{
+    color:var(--paper-raised);
+    font-size:18px;
+    margin-bottom:10px;
+    font-weight:450;
+  }
+  .trust-item p{
+    color:rgba(245,243,238,0.68);
+    font-size:14.5px;
+  }
+  .trust-note{
+    margin-top:56px;
+    padding:22px 24px;
+    border:1px solid rgba(245,243,238,0.2);
+    border-radius:var(--radius);
+    font-size:13.5px;
+    color:rgba(245,243,238,0.75);
+    font-family:var(--mono);
+    line-height:1.7;
+  }
+
+  /* ===== CTA ===== */
+  .cta{
+    text-align:center;
+    padding:100px 0;
+  }
+  .cta h2{
+    font-size:clamp(30px,4vw,46px);
+    max-width:640px;
+    margin:18px auto 30px;
+  }
+  .cta .btn{ padding:16px 32px; font-size:15.5px; }
+
+  /* ===== FOOTER ===== */
+  footer{
+    border-top:1px solid var(--line);
+    padding:48px 0 32px;
+  }
+  .footer-grid{
+    display:flex; justify-content:space-between; flex-wrap:wrap; gap:32px;
+    margin-bottom:40px;
+  }
+  .footer-cols{ display:flex; gap:64px; flex-wrap:wrap; }
+  .footer-col h5{
+    font-family:var(--mono);
+    font-size:11.5px;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    margin-bottom:14px;
+  }
+  .footer-col ul{ list-style:none; }
+  .footer-col li{ margin-bottom:9px; }
+  .footer-col a{
+    text-decoration:none;
+    font-size:14px;
+    color:var(--ink);
+  }
+  .footer-col a:hover{ color:var(--pine); }
+  .footer-legal{
+    padding-top:28px;
+    border-top:1px solid var(--line-soft);
+    font-family:var(--mono);
+    font-size:11.5px;
+    color:var(--ink-soft);
+    line-height:1.8;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <nav>
+    <a href="#" class="logo">upal<span>it</span></a>
+    <ul class="nav-links">
+      <li><a href="#how">How it works</a></li>
+      <li><a href="#marketplace">Properties</a></li>
+      <li><a href="#trust">Trust &amp; compliance</a></li>
+      <li><a href="#">Pricing</a></li>
+    </ul>
+    <div class="nav-cta">
+      <a href="#" class="btn btn-ghost">Log in</a>
+      <a href="#" class="btn btn-primary">Get started</a>
+    </div>
+  </nav>
+</header>
+
+<main>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <span class="eyebrow">A different way to buy a home</span>
+        <h1>Buy the home you want, <em>one token</em> at a time.</h1>
+        <p class="lede">Upalit lets you invest in a specific property you want to live in. As you buy tokens, your stake grows toward 30% — the point where you become eligible to apply for financing on the rest.</p>
+        <div class="hero-ctas">
+          <a href="#marketplace" class="btn btn-primary">Browse properties</a>
+          <a href="#how" class="btn btn-ghost">See how it works</a>
+        </div>
+        <p class="hero-microcopy">Token value moves with independent property appraisals — not guaranteed, and not risk-free.</p>
+      </div>
+
+      <div class="meter-card">
+        <div class="meter-card-head">
+          <div>
+            <div class="prop">Marina Court, Unit 14B</div>
+            <div class="loc">Dubai Marina · AED 2,150,000</div>
+          </div>
+        </div>
+        <div class="meter-track">
+          <div class="meter-fill"></div>
+          <div class="meter-threshold"></div>
+        </div>
+        <div class="meter-labels">
+          <span>0%</span>
+          <span>Path to ownership eligibility</span>
+          <span>100%</span>
+        </div>
+        <div class="meter-stats">
+          <div>
+            <span class="val">AED 135,450</span>
+            <span class="lbl">Tokens held</span>
+          </div>
+          <div>
+            <span class="val">63% of 30%</span>
+            <span class="lbl">Toward eligibility</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="how" id="how">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">The mechanics</span>
+        <h2>Three stages, one clear goal.</h2>
+        <p>Every property on Upalit is held in a dedicated legal entity. Tokens represent an economic interest in that entity — priced against periodic independent valuations, not guesswork.</p>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <span class="stage">Stage 01</span>
+          <h3>Choose a property</h3>
+          <p>Browse homes with live token pricing, funding progress, and full valuation history. Pick the one you actually want to live in — not just an index.</p>
+        </div>
+        <div class="step">
+          <span class="stage">Stage 02</span>
+          <h3>Buy tokens over time</h3>
+          <p>Purchase tokens on your own schedule. Your stake is tracked continuously against the property's independently appraised value.</p>
+        </div>
+        <div class="step">
+          <span class="stage">Stage 03</span>
+          <h3>Reach 30%, apply to finance the rest</h3>
+          <p>Once your holdings reach 30% of the property's value, you're eligible to apply for financing on the remaining 70% through our lending partners. Eligibility isn't a guarantee of approval.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MARKETPLACE PREVIEW -->
+  <section id="marketplace">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">Live listings</span>
+        <h2>Properties currently open to tokenization.</h2>
+        <p>Every listing shows exactly where funding stands, what a token costs today, and when the last valuation was performed.</p>
+      </div>
+
+      <div class="props-grid">
+        <div class="prop-card">
+          <div class="prop-photo"><span class="tag">62% funded</span></div>
+          <div class="prop-body">
+            <div class="loc">Dubai Marina</div>
+            <h4>Marina Court, Unit 14B</h4>
+            <div class="prop-meter"><i style="width:62%"></i></div>
+            <div class="prop-row"><span>Token price</span><b>AED 215</b></div>
+            <div class="prop-row"><span>Tokens outstanding</span><b>10,000</b></div>
+            <div class="prop-row"><span>Last appraisal</span><b>May 2026</b></div>
+          </div>
+        </div>
+
+        <div class="prop-card">
+          <div class="prop-photo"><span class="tag">41% funded</span></div>
+          <div class="prop-body">
+            <div class="loc">Jumeirah Village Circle</div>
+            <h4>Circle Residence, 3-Bed Villa</h4>
+            <div class="prop-meter"><i style="width:41%"></i></div>
+            <div class="prop-row"><span>Token price</span><b>AED 189</b></div>
+            <div class="prop-row"><span>Tokens outstanding</span><b>14,500</b></div>
+            <div class="prop-row"><span>Last appraisal</span><b>April 2026</b></div>
+          </div>
+        </div>
+
+        <div class="prop-card">
+          <div class="prop-photo"><span class="tag">88% funded</span></div>
+          <div class="prop-body">
+            <div class="loc">Business Bay</div>
+            <h4>Bay Terraces, Unit 9C</h4>
+            <div class="prop-meter"><i style="width:88%"></i></div>
+            <div class="prop-row"><span>Token price</span><b>AED 241</b></div>
+            <div class="prop-row"><span>Tokens outstanding</span><b>8,200</b></div>
+            <div class="prop-row"><span>Last appraisal</span><b>June 2026</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TRUST -->
+  <section class="trust" id="trust">
+    <div class="wrap">
+      <span class="eyebrow">Held to a higher bar</span>
+      <h2>Every property sits inside its own legal entity.</h2>
+      <p style="max-width:560px; color:rgba(245,243,238,0.72); margin-top:16px;">Upalit is structured so your token reflects a real, defensible economic interest — not a marketing term.</p>
+
+      <div class="trust-grid">
+        <div class="trust-item">
+          <h3>Independent valuation</h3>
+          <p>Each property is appraised on a fixed schedule by a licensed, independent valuer. Token price is never set internally.</p>
+        </div>
+        <div class="trust-item">
+          <h3>Segregated ownership</h3>
+          <p>Each property is held through its own dedicated entity, keeping it legally separate from Upalit's own balance sheet.</p>
+        </div>
+        <div class="trust-item">
+          <h3>Verified investors only</h3>
+          <p>Every account passes identity and eligibility checks before it can hold or trade tokens, in line with applicable regulation.</p>
+        </div>
+      </div>
+
+      <div class="trust-note">
+        Risk disclosure — property values can fall as well as rise. Tokens may be less liquid than the secondary market suggests. Reaching 30% makes you eligible to apply for financing; it is not an approval or guarantee. Full offering documents and jurisdiction-specific disclosures are provided before any purchase.
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta">
+    <div class="wrap">
+      <span class="eyebrow" style="justify-content:center;">Start small. Stay in control.</span>
+      <h2>Your first token is the first square foot you'll ever own.</h2>
+      <a href="#marketplace" class="btn btn-primary">Browse properties</a>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="footer-grid">
+      <a href="#" class="logo">upal<span>it</span></a>
+      <div class="footer-cols">
+        <div class="footer-col">
+          <h5>Platform</h5>
+          <ul>
+            <li><a href="#how">How it works</a></li>
+            <li><a href="#marketplace">Properties</a></li>
+            <li><a href="#">Dashboard</a></li>
+            <li><a href="#">Pricing &amp; fees</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h5>Trust</h5>
+          <ul>
+            <li><a href="#trust">Legal structure</a></li>
+            <li><a href="#">Risk disclosures</a></li>
+            <li><a href="#">Security</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h5>Company</h5>
+          <ul>
+            <li><a href="#">About</a></li>
+            <li><a href="#">Contact</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="footer-legal">
+      Upalit is not a bank and does not offer deposit accounts. Tokens represent an economic interest in a property-holding entity and are offered only to eligible, verified investors in permitted jurisdictions. This site is a product preview; final regulatory disclosures pending legal review. © 2026 Upalit.
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
