@@ -1,174 +1,218 @@
-import { Router } from "express";
-import rateLimit from "express-rate-limit";
-import { nanoid } from "nanoid";
-import { withDb } from "../db.js";
-import {
-  hashPassword,
-  verifyPassword,
-  signAccessToken,
-  signRefreshToken,
-  verifyRefreshToken,
-  toPublicUser,
-  isPasswordStrongEnough,
-  isValidEmail,
-} from "../utils/auth.js";
-import { requireAuth } from "../middleware/auth.js";
-import { recordAudit } from "../utils/audit.js";
+import express from 'express';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import rateLimit from 'express-rate-limit';
+import { getDb, save, findUserByEmail, findUserById, generateId } from '../db.js';
 
-const router = Router();
+const router = express.Router();
 
-// Slow down credential-stuffing / brute-force attempts against login.
-const loginLimiter = rateLimit({
+// ===== Rate Limiters =====
+const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 10,
+  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX) || 20,
+  message: { error: 'Too many authentication attempts, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: "Too many login attempts. Try again in a few minutes." },
 });
 
-const registerLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  limit: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many accounts created from this network. Try again later." },
-});
+// ===== Validation =====
+const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+const validatePassword = (password) => password && password.length >= 8;
 
-/**
- * POST /api/auth/register
- * Creates an investor account. KYC/eligibility screening happens
- * separately (kycStatus starts "pending") — this endpoint only handles
- * credentials.
- */
-router.post("/register", registerLimiter, async (req, res) => {
-  const { email, password, fullName } = req.body || {};
+// ===== Register =====
+router.post('/register', authLimiter, async (req, res) => {
+  const { email, password, fullName } = req.body;
 
-  if (!isValidEmail(email)) {
-    return res.status(400).json({ error: "A valid email address is required" });
-  }
-  if (!isPasswordStrongEnough(password)) {
-    return res.status(400).json({ error: "Password must be at least 10 characters" });
-  }
-  if (!fullName || typeof fullName !== "string" || fullName.trim().length < 2) {
-    return res.status(400).json({ error: "Full name is required" });
+  if (!email || !password || !fullName) {
+    return res.status(400).json({ error: 'Missing required fields: email, password, fullName' });
   }
 
-  try {
-    const result = await withDb(async (db) => {
-      const existing = db.users.find(
-        (u) => u.email.toLowerCase() === email.toLowerCase()
-      );
-      if (existing) {
-        return { conflict: true };
-      }
-
-      const user = {
-        id: nanoid(),
-        email: email.toLowerCase(),
-        fullName: fullName.trim(),
-        passwordHash: await hashPassword(password),
-        role: "investor",
-        kycStatus: "pending", // pending -> in_review -> verified | rejected
-        disabled: false,
-        createdAt: new Date().toISOString(),
-      };
-      db.users.push(user);
-      recordAudit(db, { actorId: user.id, action: "user.register", target: user.id });
-      return { user };
-    });
-
-    if (result.conflict) {
-      // Same message as "success" territory is avoided here deliberately —
-      // email enumeration is a lower concern than user confusion for this
-      // flow, but swap to a generic message if that trade-off changes.
-      return res.status(409).json({ error: "An account with this email already exists" });
-    }
-
-    const accessToken = signAccessToken(result.user);
-    const refreshToken = signRefreshToken(result.user);
-
-    res.status(201).json({
-      user: toPublicUser(result.user),
-      accessToken,
-      refreshToken,
-    });
-  } catch (err) {
-    console.error("register failed:", err);
-    res.status(500).json({ error: "Could not create account" });
-  }
-});
-
-/**
- * POST /api/auth/login
- */
-router.post("/login", loginLimiter, async (req, res) => {
-  const { email, password } = req.body || {};
-
-  if (!isValidEmail(email) || !password) {
-    return res.status(400).json({ error: "Email and password are required" });
+  if (!validateEmail(email)) {
+    return res.status(400).json({ error: 'Invalid email format' });
   }
 
-  const db = await withDb(async (db) => db); // read-only, but keep it consistent
-  const user = db.users.find((u) => u.email.toLowerCase() === email.toLowerCase());
-
-  // Always run bcrypt.compare even on "user not found" so response timing
-  // doesn't reveal whether an email is registered.
-  const passwordHash = user?.passwordHash ?? "$2a$12$invalidinvalidinvalidinvalidinvalidinvalidinvalidinva";
-  const passwordOk = await verifyPassword(password ?? "", passwordHash);
-
-  if (!user || !passwordOk) {
-    return res.status(401).json({ error: "Invalid email or password" });
-  }
-  if (user.disabled) {
-    return res.status(403).json({ error: "This account has been disabled" });
+  if (!validatePassword(password)) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
   }
 
-  const accessToken = signAccessToken(user);
-  const refreshToken = signRefreshToken(user);
+  if (fullName.length < 2) {
+    return res.status(400).json({ error: 'Full name must be at least 2 characters' });
+  }
 
-  await withDb(async (db) => {
-    const u = db.users.find((x) => x.id === user.id);
-    recordAudit(db, { actorId: u.id, action: "user.login", target: u.id });
-  });
+  const db = getDb();
 
-  res.json({
-    user: toPublicUser(user),
+  if (findUserByEmail(email)) {
+    return res.status(409).json({ error: 'Email already registered' });
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 12);
+
+  const user = {
+    id: generateId(),
+    email: email.toLowerCase(),
+    fullName: fullName.trim(),
+    password: hashedPassword,
+    role: 'investor',
+    kycStatus: 'pending',
+    disabled: false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  db.users.push(user);
+  await save();
+
+  const accessToken = jwt.sign(
+    { id: user.id, email: user.email, role: user.role },
+    process.env.JWT_ACCESS_SECRET,
+    { expiresIn: process.env.JWT_ACCESS_EXPIRY || '15m' }
+  );
+
+  const refreshToken = jwt.sign(
+    { id: user.id },
+    process.env.JWT_REFRESH_SECRET,
+    { expiresIn: process.env.JWT_REFRESH_EXPIRY || '7d' }
+  );
+
+  const { password: _, ...userWithoutPassword } = user;
+
+  res.status(201).json({
+    user: userWithoutPassword,
     accessToken,
     refreshToken,
   });
 });
 
-/**
- * POST /api/auth/refresh
- * Exchanges a valid refresh token for a new access token.
- */
-router.post("/refresh", async (req, res) => {
-  const { refreshToken } = req.body || {};
+// ===== Login =====
+router.post('/login', authLimiter, async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password required' });
+  }
+
+  const user = findUserByEmail(email);
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid credentials' });
+  }
+
+  if (user.disabled) {
+    return res.status(403).json({ error: 'Account has been disabled' });
+  }
+
+  const valid = await bcrypt.compare(password, user.password);
+  if (!valid) {
+    return res.status(401).json({ error: 'Invalid credentials' });
+  }
+
+  const accessToken = jwt.sign(
+    { id: user.id, email: user.email, role: user.role },
+    process.env.JWT_ACCESS_SECRET,
+    { expiresIn: process.env.JWT_ACCESS_EXPIRY || '15m' }
+  );
+
+  const refreshToken = jwt.sign(
+    { id: user.id },
+    process.env.JWT_REFRESH_SECRET,
+    { expiresIn: process.env.JWT_REFRESH_EXPIRY || '7d' }
+  );
+
+  const { password: _, ...userWithoutPassword } = user;
+
+  res.json({
+    user: userWithoutPassword,
+    accessToken,
+    refreshToken,
+  });
+});
+
+// ===== Refresh Token =====
+router.post('/refresh', async (req, res) => {
+  const { refreshToken } = req.body;
+
   if (!refreshToken) {
-    return res.status(400).json({ error: "refreshToken is required" });
+    return res.status(400).json({ error: 'Refresh token required' });
   }
 
-  let payload;
   try {
-    payload = verifyRefreshToken(refreshToken);
-  } catch {
-    return res.status(401).json({ error: "Invalid or expired refresh token" });
-  }
+    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+    const user = findUserById(decoded.id);
 
-  const db = await withDb(async (db) => db);
-  const user = db.users.find((u) => u.id === payload.sub);
-  if (!user || user.disabled) {
-    return res.status(401).json({ error: "User no longer active" });
-  }
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
 
-  res.json({ accessToken: signAccessToken(user) });
+    if (user.disabled) {
+      return res.status(403).json({ error: 'Account disabled' });
+    }
+
+    const accessToken = jwt.sign(
+      { id: user.id, email: user.email, role: user.role },
+      process.env.JWT_ACCESS_SECRET,
+      { expiresIn: process.env.JWT_ACCESS_EXPIRY || '15m' }
+    );
+
+    res.json({ accessToken });
+  } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Refresh token expired' });
+    }
+    res.status(401).json({ error: 'Invalid refresh token' });
+  }
 });
 
-/**
- * GET /api/auth/me
- */
-router.get("/me", requireAuth, async (req, res) => {
-  res.json({ user: req.user });
+// ===== Logout =====
+router.post('/logout', (req, res) => {
+  res.json({ message: 'Logged out successfully' });
 });
+
+// ===== Get Current User =====
+router.get('/me', authenticate, (req, res) => {
+  const { password, ...userWithoutPassword } = req.user;
+  res.json({ user: userWithoutPassword });
+});
+
+// ===== Authentication Middleware =====
+export const authenticate = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const token = authHeader.slice(7);
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
+    const user = findUserById(decoded.id);
+
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+
+    if (user.disabled) {
+      return res.status(403).json({ error: 'Account disabled' });
+    }
+
+    req.user = user;
+    next();
+  } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Access token expired' });
+    }
+    res.status(401).json({ error: 'Invalid access token' });
+  }
+};
+
+// ===== Admin Middleware =====
+export const requireAdmin = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  next();
+};
 
 export default router;

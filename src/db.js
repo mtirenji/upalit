@@ -1,73 +1,137 @@
-// db.js
-//
-// A minimal file-backed JSON store. This exists so the auth/admin backend
-// runs end-to-end without provisioning a real database. Swap this module
-// out for a real one (Postgres via Prisma/Knex, etc.) before production —
-// see the note at the bottom of this file.
-
-import { readFile, writeFile } from "fs/promises";
-import { existsSync, mkdirSync } from "fs";
-import { fileURLToPath } from "url";
-import path from "path";
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.join(__dirname, "..", "data");
-const DATA_FILE = path.join(DATA_DIR, "db.json");
+const DATA_DIR = path.join(__dirname, '../data');
+const DB_PATH = path.join(DATA_DIR, 'db.json');
 
-if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
+let db = null;
+let writeQueue = Promise.resolve();
+let isInitialized = false;
 
-const EMPTY_DB = {
-  users: [],       // { id, email, passwordHash, role, kycStatus, createdAt }
-  properties: [],  // { id, name, location, valuationAed, tokenPriceAed, tokensOutstanding, tokensSold, status, lastAppraisalAt, createdAt }
-  auditLog: [],     // { id, actorId, action, target, meta, at }
+const defaultDb = () => ({
+  users: [],
+  properties: [],
+  tokens: [],
+  auditLog: [],
+  _meta: {
+    version: '1.0.0',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+});
+
+export const getDb = () => {
+  if (!db) throw new Error('Database not initialized. Call withDb() first.');
+  return db;
 };
 
-// Simple in-process write queue so concurrent requests don't clobber the file.
-let writeQueue = Promise.resolve();
+export const withDb = async () => {
+  if (isInitialized && db) return db;
 
-async function readDb() {
-  if (!existsSync(DATA_FILE)) {
-    await writeFile(DATA_FILE, JSON.stringify(EMPTY_DB, null, 2));
-    return structuredClone(EMPTY_DB);
-  }
-  const raw = await readFile(DATA_FILE, "utf-8");
   try {
-    return JSON.parse(raw);
-  } catch {
-    // Corrupt file — don't silently eat data, fail loudly.
-    throw new Error(`db.json is not valid JSON (${DATA_FILE})`);
+    await fs.mkdir(DATA_DIR, { recursive: true });
+
+    try {
+      const data = await fs.readFile(DB_PATH, 'utf-8');
+      db = JSON.parse(data);
+      if (!db.users) db.users = [];
+      if (!db.properties) db.properties = [];
+      if (!db.tokens) db.tokens = [];
+      if (!db.auditLog) db.auditLog = [];
+      if (!db._meta) db._meta = defaultDb()._meta;
+      db._meta.updatedAt = new Date().toISOString();
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        db = defaultDb();
+        await saveDb();
+        console.log('📁 Created new database file');
+      } else {
+        throw error;
+      }
+    }
+
+    isInitialized = true;
+    return db;
+  } catch (error) {
+    console.error('❌ Database initialization error:', error);
+    throw error;
   }
-}
+};
 
-async function writeDb(next) {
-  writeQueue = writeQueue.then(() =>
-    writeFile(DATA_FILE, JSON.stringify(next, null, 2))
-  );
-  return writeQueue;
-}
+const saveDb = async () => {
+  if (!db) return;
 
-/**
- * Run a read-modify-write transaction against the JSON store.
- * `fn` receives the current db object, mutates it in place (or returns
- * a replacement), and the result is persisted.
- */
-export async function withDb(fn) {
-  const db = await readDb();
-  const result = await fn(db);
-  await writeDb(db);
-  return result;
-}
+  writeQueue = writeQueue.then(async () => {
+    try {
+      const backupPath = `${DB_PATH}.backup`;
+      try {
+        await fs.copyFile(DB_PATH, backupPath);
+      } catch {
+        // Ignore if original doesn't exist
+      }
 
-export async function getDb() {
-  return readDb();
-}
+      db._meta.updatedAt = new Date().toISOString();
+      await fs.writeFile(DB_PATH, JSON.stringify(db, null, 2));
 
-/*
- * PRODUCTION NOTE:
- * This file-based store is fine for local development and demoing the
- * auth/admin flow, but it is not safe for concurrent production traffic
- * (no real transactions, no indexing, whole file rewritten on every
- * write). Before going live, replace db.js with a real database client
- * (e.g. Postgres + Prisma) behind the same withDb()/getDb() interface
- * so the rest of the app doesn't need to change.
- */
+      try {
+        await fs.unlink(backupPath);
+      } catch {
+        // Ignore cleanup errors
+      }
+    } catch (error) {
+      console.error('❌ Failed to save database:', error);
+      throw error;
+    }
+  });
+
+  await writeQueue;
+};
+
+export const save = saveDb;
+
+// ===== Helpers =====
+export const findUserByEmail = (email) => {
+  return db?.users?.find(u => u.email.toLowerCase() === email.toLowerCase());
+};
+
+export const findUserById = (id) => {
+  return db?.users?.find(u => u.id === id);
+};
+
+export const findPropertyById = (id) => {
+  return db?.properties?.find(p => p.id === id);
+};
+
+export const findTokenByUserId = (userId, propertyId) => {
+  return db?.tokens?.find(t => t.userId === userId && t.propertyId === propertyId);
+};
+
+export const generateId = () => {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+};
+
+export const paginate = (array, page = 1, limit = 20) => {
+  const start = (page - 1) * limit;
+  const end = start + limit;
+  return {
+    data: array.slice(start, end),
+    total: array.length,
+    page: parseInt(page),
+    limit: parseInt(limit),
+    totalPages: Math.ceil(array.length / limit),
+  };
+};
+
+export default {
+  getDb,
+  withDb,
+  save,
+  findUserByEmail,
+  findUserById,
+  findPropertyById,
+  findTokenByUserId,
+  generateId,
+  paginate,
+};
