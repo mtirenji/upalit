@@ -3,13 +3,12 @@ name = "upalit-backend"
 main = "src/worker.js"
 compatibility_date = "2024-01-01"
 
+# No static assets - this is an API only
+
 [vars]
 NODE_ENV = "production"
-
-[[r2_buckets]]
-binding = "DATA_BUCKET"
-bucket_name = "upalit-data"
-preview_bucket_name = "upalit-data-preview"
+JWT_ACCESS_SECRET = "your-access-secret-here"
+JWT_REFRESH_SECRET = "your-refresh-secret-here"
 
 [env.production]
 vars = { NODE_ENV = "production" }
