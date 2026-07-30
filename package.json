@@ -1,4 +1,5 @@
-@"
+# Create package.json with proper JSON
+$packageJson = @'
 {
   "name": "upalit-backend",
   "version": "0.1.0",
@@ -31,4 +32,6 @@
     "node": ">=18.0.0"
   }
 }
-"@ | Out-File -FilePath package.json -Encoding utf8
+'@
+
+$packageJson | Out-File -FilePath package.json -Encoding utf8
